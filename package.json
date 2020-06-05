@@ -1,0 +1,25 @@
+{
+  "name": "js-game",
+  "version": "1.0.0",
+  "description": "A Javascript Game",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dkwasny/js-game.git"
+  },
+  "author": "David Kwasny",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dkwasny/js-game/issues"
+  },
+  "homepage": "https://github.com/dkwasny/js-game#readme",
+  "devDependencies": {
+    "eslint": "^7.1.0",
+    "typescript": "^3.9.5",
+    "@typescript-eslint/parser": "^3.1.0",
+    "@typescript-eslint/eslint-plugin": "^3.1.0"
+  }
+}
