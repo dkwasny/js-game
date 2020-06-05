@@ -1,35 +1,34 @@
-const canvas = document.getElementById('kwasCanvas') as HTMLCanvasElement;
-const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+import { Display } from './display.js';
+
+const display = new Display(document.getElementById('kwasCanvas') as HTMLCanvasElement, 10, 10, true);
+
 const mainDiv = document.getElementById('mainDiv') as HTMLElement;
 const header = document.getElementById('header') as HTMLElement;
 
-let wCanvasRatio = 1;
-let hCanvasRatio = 1;
-
 const setRatio = function() {
-    const input = prompt('New Aspect Ratio (w:h)');
+    const input = prompt('New Internal Resolution (w:h)');
     if (input != null) {
         const [newW,newH] = input.split(':');
-        wCanvasRatio = +newW;
-        hCanvasRatio = +newH;
+        display.resize(+newW, +newH);
     }
 };
 
 const square = {
-    x: 0.5,
-    y: 0.5,
-    height: 0.25,
-    width: 0.25,
+    x: 0,
+    y: 0,
+    height: 1,
+    width: 1,
     colorHex: '#c65d6d',
-    draw: function(canvasHeight: number, canvasWidth: number, ctx: CanvasRenderingContext2D) {
+    draw: function(display: Display) {
+        const ctx = display.context;
         ctx.fillStyle = this.colorHex;
 
-        const sX = this.x * canvasWidth;
-        const sY = this.y * canvasHeight;
-        const sHeight = this.height * canvasHeight;
-        const sWidth = this.width * canvasWidth;
-
-        ctx.fillRect(sX, sY, sWidth, sHeight);
+        ctx.fillRect(
+            display.transposeX(this.x),
+            display.transposeY(this.y),
+            display.transposeX(this.width),
+            display.transposeY(this.height)
+        );
     }
 };
 
@@ -37,16 +36,16 @@ const handleKeyPress = function(event: KeyboardEvent) {
     const key = event.key;
     switch(key) {
     case 'ArrowLeft':
-        square.x -= 0.01;
+        square.x -= 1;
         break;
     case 'ArrowRight':
-        square.x += 0.01;
+        square.x += 1;
         break;
     case 'ArrowUp':
-        square.y -= 0.01;
+        square.y -= 1;
         break;
     case 'ArrowDown':
-        square.y += 0.01;
+        square.y += 1;
         break;
     case 'a':
         setRatio();
@@ -58,30 +57,11 @@ const draw = function() {
     const windowHeight = mainDiv.clientHeight - header.clientHeight;
     const windowWidth = mainDiv.clientWidth;
 
-    let newCanvasHeight = 0;
-    let newCanvasWidth = 0;
-    
-    const wGrowth = windowWidth / wCanvasRatio;
-    const hGrowth = windowHeight / hCanvasRatio;
+    display.resize(windowWidth, windowHeight);
 
-    if (wGrowth < hGrowth) {
-        newCanvasWidth = windowWidth;
-        newCanvasHeight = windowWidth * hCanvasRatio / wCanvasRatio;
-    }
-    else {
-        newCanvasWidth = windowHeight * wCanvasRatio / hCanvasRatio;
-        newCanvasHeight = windowHeight;
-    }
+    display.context.clearRect(0, 0, display.transposeX(1920), display.transposeY(1080));
 
-    canvas.height = newCanvasHeight;
-    canvas.width = newCanvasWidth;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const height = canvas.height;
-    const width = canvas.width;
-
-    square.draw(height, width, ctx);
+    square.draw(display);
 };
 
 window.setInterval(draw, 16);
