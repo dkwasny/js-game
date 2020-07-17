@@ -1,12 +1,5 @@
-import { Display } from './display.js';
+import { Display } from './Display.js';
 
-const display = new Display(document.getElementById('kwasCanvas') as HTMLCanvasElement, 100, 100, true);
-
-const mainDiv = document.getElementById('mainDiv') as HTMLElement;
-const header = document.getElementById('header') as HTMLElement;
-
-let currHeight = 0;
-let currWidth = 0;
 
 const setRes = function() {
     const input = prompt('New Internal Resolution (w:h)');
@@ -19,15 +12,15 @@ const setRes = function() {
 };
 
 const togglePreserveAspectRatio = function() {
+    console.log(display.preserveAspectRatio);
     display.preserveAspectRatio = !display.preserveAspectRatio;
-    display.resize(currWidth, currHeight);
 };
 
 const square = {
     x: 0,
     y: 0,
-    height: 1,
-    width: 1,
+    height: 10,
+    width: 10,
     colorHex: '#c65d6d',
     draw: function(display: Display) {
         const ctx = display.context;
@@ -70,19 +63,11 @@ const handleKeyPress = function(event: KeyboardEvent) {
     }
 };
 
-const draw = function(timestamp: DOMHighResTimeStamp) {
-    const windowHeight = mainDiv.clientHeight - header.clientHeight;
-    const windowWidth = mainDiv.clientWidth;
-
-    if (currHeight !== windowHeight || currWidth !== windowWidth) {
-        display.resize(windowWidth, windowHeight);
-        currHeight = windowHeight;
-        currWidth = windowWidth;
-    }
-    display.clear();
+const draw = function(display: Display, delta: number) {
     square.draw(display);
-    window.requestAnimationFrame(draw);
 };
 
-window.requestAnimationFrame(draw);
+const display = new Display(document.getElementById('kwasCanvas') as HTMLCanvasElement, draw, 100, 100, true);
+display.start();
+
 window.addEventListener('keydown', handleKeyPress);
