@@ -92,3 +92,8 @@ const display = new Display(document.getElementById('kwasCanvas') as HTMLCanvasE
 display.start();
 
 window.addEventListener('keydown', handleKeyPress);
+
+const resize = function() {
+    display.resize();
+};
+window.onresize = resize;

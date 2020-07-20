@@ -87,26 +87,31 @@ export class Display {
         return value * this.canvas.height / this.internalHeight;
     }
 
-    resize(width: number, height: number): void {
+    resize(): void {
         // TODO: do dynamic for real
-        // let actualWidth = width;
-        // let actualHeight = height;
 
-        // if (this.preserveAspectRatio) {
-        //     const scaledHeight = width * this.internalHeight / this.internalWidth;
-        //     if (scaledHeight < height) {
-        //         actualWidth = width;
-        //         actualHeight = scaledHeight;
-        //     }
-        //     else {
-        //         actualWidth = height * this.internalWidth / this.internalHeight;
-        //         actualHeight = height;
-        //     }
-        // }
+        // const windowHeight = this.container.clientHeight;
+        // const windowWidth = this.container.clientWidth;
 
-        // this.canvas.height = actualHeight;
-        // this.canvas.width = actualWidth;
-        // this.glCtx.viewport(0, 0, this.currWidth, this.currHeight);
+        let actualWidth = this.container.clientWidth;
+        let actualHeight = this.container.clientHeight;
+
+        if (this.preserveAspectRatio) {
+            const scaledHeight = actualWidth * this.internalHeight / this.internalWidth;
+            if (scaledHeight < actualHeight) {
+                // actualWidth = actualWidth;
+                actualHeight = scaledHeight;
+            }
+            else {
+                actualWidth = actualHeight * this.internalWidth / this.internalHeight;
+                // actualHeight = actualHeight;
+            }
+        }
+
+        this.canvas.height = actualHeight;
+        this.canvas.width = actualWidth;
+        this.glCtx.viewport(0, 0, actualWidth, actualHeight);
+        this.glCtx.vertexAttrib2f(this.glResolutionAttributeLocation, this.internalWidth, this.internalHeight);
     }
 
     clear(): void {
@@ -117,7 +122,8 @@ export class Display {
 
     start(): void {
         // TODO: do dynamic for real
-        this.glCtx.viewport(0, 0, 800, 600);
+        // this.glCtx.viewport(0, 0, 800, 600);
+        this.resize();
         this.nextFrame();
     }
 
@@ -129,18 +135,18 @@ export class Display {
         // TODO: Try and move around
         this.glCtx.useProgram(this.glProgram);
 
-        const windowHeight = this.container.clientHeight;
-        const windowWidth = this.container.clientWidth;
+        // const windowHeight = this.container.clientHeight;
+        // const windowWidth = this.container.clientWidth;
     
-        if (this.currHeight !== windowHeight || this.currWidth !== windowWidth) {
-            this.resize(windowWidth, windowHeight);
-            this.currHeight = windowHeight;
-            this.currWidth = windowWidth;
-        }
+        // if (this.currHeight !== windowHeight || this.currWidth !== windowWidth) {
+        //     this.resize(windowWidth, windowHeight);
+        //     this.currHeight = windowHeight;
+        //     this.currWidth = windowWidth;
+        // }
 
         this.clear();
 
-        this.glCtx.vertexAttrib2f(this.glResolutionAttributeLocation, this.internalWidth, this.internalHeight);
+        // this.glCtx.vertexAttrib2f(this.glResolutionAttributeLocation, this.internalWidth, this.internalHeight);
 
         this.drawCallback(this, timestamp - this.lastFrameTimestamp);
         this.lastFrameTimestamp = timestamp;
@@ -156,6 +162,6 @@ export class Display {
     }
     set preserveAspectRatio(pValue: boolean) {
         this._preserveAspectRatio = pValue;
-        this.resize(this.currWidth, this.currHeight);
+        this.resize();
     }
 }
