@@ -1,5 +1,5 @@
-import { Display } from './Display.js';
-
+import { Display } from './display.js';
+import { Color } from './color.js';
 
 const setRes = function() {
     const input = prompt('New Internal Resolution (w:h)');
@@ -21,24 +21,10 @@ const square = {
     y: 0,
     height: 10,
     width: 10,
-    colorHex: '#c65d6d',
+    color: new Color(198, 93, 109, 1.0),
     draw: function(display: Display) {
-        const glCtx = display.context;
-
-        glCtx.uniform3f(display.glColorUniformLocation, 198, 93, 109);
-
-        glCtx.enableVertexAttribArray(display.glPositionAttributeLocation);
-        glCtx.bindBuffer(glCtx.ARRAY_BUFFER, display.glPositionBuffer);
-        glCtx.vertexAttribPointer(
-            display.glPositionAttributeLocation,
-            2,
-            glCtx.FLOAT,
-            false,
-            0,
-            0
-        );
-
-        const positionData = new Float32Array([
+        display.setColor(this.color);
+        const positionData = [
             this.x, this.y, // top left
             this.x + this.width, this.y, // top right
             this.x, this.y + this.height, // bottom left
@@ -46,11 +32,8 @@ const square = {
             this.x, this.y + this.height, // bottom left
             this.x + this.width, this.y, // top right
             this.x + this.width, this.y + this.height // bottom right
-        ]);
-
-        glCtx.bufferData(glCtx.ARRAY_BUFFER, positionData, glCtx.DYNAMIC_DRAW);
-
-        glCtx.drawArrays(glCtx.TRIANGLES, 0, positionData.length / 2);
+        ];
+        display.drawTriangles(positionData);
     },
     reset: function() {
         this.x = 0;
@@ -88,7 +71,8 @@ const draw = function(display: Display, delta: number) {
 
 const canvas = document.getElementById('kwasCanvas') as HTMLCanvasElement;
 
-const display = new Display(document.getElementById('kwasCanvas') as HTMLCanvasElement, draw, 100, 100, true);
+const backgroundColor = new Color(50, 54, 140);
+const display = new Display(document.getElementById('kwasCanvas') as HTMLCanvasElement, draw, 100, 100, true, backgroundColor);
 display.start();
 
 window.addEventListener('keydown', handleKeyPress);

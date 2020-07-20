@@ -1,3 +1,5 @@
+import { Color } from './color.js';
+
 const vertexShaderCode = `
     attribute vec2 inputPosition;
     attribute vec2 resolution;
@@ -10,151 +12,135 @@ const vertexShaderCode = `
 
 const fragmentShaderCode = `
     precision mediump float;
-    uniform vec3 inputColor;
+
+    const vec4 scale = vec4(255.0, 255.0, 255.0, 1.0);
+    uniform vec4 inputColor;
 
     void main() {
-        gl_FragColor = vec4(inputColor / 255.0, 1);
+        gl_FragColor = inputColor / scale;
     }
 `;
 
 export class Display {
     private readonly container: HTMLElement;
     private readonly canvas: HTMLCanvasElement;
-    // private readonly ctx: CanvasRenderingContext2D;
     private readonly glCtx: WebGLRenderingContext;
     private readonly drawCallback: (display: Display, delta: number) => void;
-
-    private currHeight = 0;
-    private currWidth = 0;
 
     private lastFrameTimestamp = 0;
 
     private _preserveAspectRatio: boolean;
+    private _internalWidth: number;
+    private _internalHeight: number;
 
-    internalWidth: number;
-    internalHeight: number;
+    private readonly glResolutionAttributeLocation: number;
 
-    glProgram: WebGLProgram;
+    private readonly glPositionAttributeLocation: number;
+    private readonly glPositionBuffer: WebGLBuffer;
 
-    glPositionAttributeLocation: number;
-    glPositionBuffer: WebGLBuffer;
+    private readonly glColorUniformLocation: WebGLUniformLocation;
 
-    glResolutionAttributeLocation: number;
-
-    glColorUniformLocation: WebGLUniformLocation;
+    clearColor: Color;
 
     constructor(
         pCanvas: HTMLCanvasElement,
         pDrawCallback: (display: Display, delta: number) => void,
         pInternalWidth: number,
         pInternalHeight: number,
-        pPreserveAspectRatio: boolean
+        pPreserveAspectRatio: boolean,
+        pClearColor: Color
     ) {
         this.canvas = pCanvas;
         this.container = pCanvas.parentElement as HTMLElement;
-        // this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
         this.glCtx = this.canvas.getContext('webgl') as WebGLRenderingContext;
         this.drawCallback = pDrawCallback;
-        this.internalWidth = pInternalWidth;
-        this.internalHeight = pInternalHeight;
+        this._internalWidth = pInternalWidth;
+        this._internalHeight = pInternalHeight;
         this._preserveAspectRatio = pPreserveAspectRatio;
+        this.clearColor = pClearColor;
 
-        this.glProgram = this.glCtx.createProgram() as WebGLProgram;
-        const vertexShader = this.glCtx.createShader(this.glCtx.VERTEX_SHADER) as WebGLShader;
-        this.glCtx.shaderSource(vertexShader, vertexShaderCode);
-        this.glCtx.compileShader(vertexShader);
-        this.glCtx.attachShader(this.glProgram, vertexShader);
+        const glProgram = this.glCtx.createProgram() as WebGLProgram;
 
-        const fragmentShader = this.glCtx.createShader(this.glCtx.FRAGMENT_SHADER) as WebGLShader;
-        this.glCtx.shaderSource(fragmentShader, fragmentShaderCode);
-        this.glCtx.compileShader(fragmentShader);
-        this.glCtx.attachShader(this.glProgram, fragmentShader);
-        
-        this.glCtx.linkProgram(this.glProgram);
+        this.createShader(vertexShaderCode, this.glCtx.VERTEX_SHADER, glProgram, 'vertex');
+        this.createShader(fragmentShaderCode, this.glCtx.FRAGMENT_SHADER, glProgram, 'fragment');
 
-        this.glPositionAttributeLocation = this.glCtx.getAttribLocation(this.glProgram, 'inputPosition');
-        this.glResolutionAttributeLocation = this.glCtx.getAttribLocation(this.glProgram, 'resolution');
-        this.glColorUniformLocation = this.glCtx.getUniformLocation(this.glProgram, 'inputColor') as WebGLUniformLocation;
+        this.glCtx.linkProgram(glProgram);
+
+        this.glPositionAttributeLocation = this.glCtx.getAttribLocation(glProgram, 'inputPosition');
+        this.glResolutionAttributeLocation = this.glCtx.getAttribLocation(glProgram, 'resolution');
+        this.glColorUniformLocation = this.glCtx.getUniformLocation(glProgram, 'inputColor') as WebGLUniformLocation;
 
         this.glPositionBuffer = this.glCtx.createBuffer() as WebGLBuffer;
-    }
 
-    tX(value: number): number {
-        return value * this.canvas.width / this.internalWidth;
-    }
+        this.glCtx.useProgram(glProgram);
 
-    tY(value: number): number {
-        return value * this.canvas.height / this.internalHeight;
+        this.glCtx.enable(this.glCtx.BLEND);
+        // KWAS TODO: Better understand alpha stuff
+        this.glCtx.blendFunc(this.glCtx.SRC_ALPHA, this.glCtx.ONE_MINUS_SRC_ALPHA);
     }
 
     resize(): void {
-        // TODO: do dynamic for real
-
-        // const windowHeight = this.container.clientHeight;
-        // const windowWidth = this.container.clientWidth;
-
         let actualWidth = this.container.clientWidth;
         let actualHeight = this.container.clientHeight;
 
         if (this.preserveAspectRatio) {
-            const scaledHeight = actualWidth * this.internalHeight / this.internalWidth;
+            const scaledHeight = actualWidth * this._internalHeight / this._internalWidth;
             if (scaledHeight < actualHeight) {
-                // actualWidth = actualWidth;
                 actualHeight = scaledHeight;
             }
             else {
-                actualWidth = actualHeight * this.internalWidth / this.internalHeight;
-                // actualHeight = actualHeight;
+                actualWidth = actualHeight * this._internalWidth / this._internalHeight;
             }
         }
 
         this.canvas.height = actualHeight;
         this.canvas.width = actualWidth;
         this.glCtx.viewport(0, 0, actualWidth, actualHeight);
-        this.glCtx.vertexAttrib2f(this.glResolutionAttributeLocation, this.internalWidth, this.internalHeight);
+        this.glCtx.vertexAttrib2f(this.glResolutionAttributeLocation, this._internalWidth, this._internalHeight);
     }
 
     clear(): void {
-        // this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.glCtx.clearColor(50 / 255, 54 / 255, 140 / 255, 1);
+        this.glCtx.clearColor(
+            this.clearColor.red / 255,
+            this.clearColor.green / 255,
+            this.clearColor.blue / 255,
+            this.clearColor.alpha
+        );
         this.glCtx.clear(this.glCtx.COLOR_BUFFER_BIT);
     }
 
     start(): void {
-        // TODO: do dynamic for real
-        // this.glCtx.viewport(0, 0, 800, 600);
         this.resize();
         this.nextFrame();
     }
 
-    private nextFrame(): void {
-        window.requestAnimationFrame((t: DOMHighResTimeStamp) => this.draw(t));
+    setColor(color: Color): void {
+        this.glCtx.uniform4f(this.glColorUniformLocation, color.red, color.green, color.blue, color.alpha);
     }
 
-    private draw(timestamp: DOMHighResTimeStamp): void {
-        // TODO: Try and move around
-        this.glCtx.useProgram(this.glProgram);
-
-        // const windowHeight = this.container.clientHeight;
-        // const windowWidth = this.container.clientWidth;
-    
-        // if (this.currHeight !== windowHeight || this.currWidth !== windowWidth) {
-        //     this.resize(windowWidth, windowHeight);
-        //     this.currHeight = windowHeight;
-        //     this.currWidth = windowWidth;
-        // }
-
-        this.clear();
-
-        // this.glCtx.vertexAttrib2f(this.glResolutionAttributeLocation, this.internalWidth, this.internalHeight);
-
-        this.drawCallback(this, timestamp - this.lastFrameTimestamp);
-        this.lastFrameTimestamp = timestamp;
-        this.nextFrame();
+    drawTriangles(points: number[]): void {
+        this.glCtx.enableVertexAttribArray(this.glPositionAttributeLocation);
+        this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.glPositionBuffer);
+        this.glCtx.vertexAttribPointer(
+            this.glPositionAttributeLocation,
+            2,
+            this.glCtx.FLOAT,
+            false,
+            0,
+            0
+        );
+        this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, new Float32Array(points), this.glCtx.DYNAMIC_DRAW);
+        this.glCtx.drawArrays(this.glCtx.TRIANGLES, 0, points.length / 2);
     }
 
-    get context(): WebGLRenderingContext {
-        return this.glCtx;
+    set internalHeight(pValue: number) {
+        this._internalHeight = pValue;
+        this.resize();
+    }
+
+    set internalWidth(pValue: number) {
+        this._internalWidth = pValue;
+        this.resize();
     }
 
     get preserveAspectRatio(): boolean {
@@ -163,5 +149,31 @@ export class Display {
     set preserveAspectRatio(pValue: boolean) {
         this._preserveAspectRatio = pValue;
         this.resize();
+    }
+
+    private nextFrame(): void {
+        window.requestAnimationFrame((t: DOMHighResTimeStamp) => this.draw(t));
+    }
+
+    private draw(timestamp: DOMHighResTimeStamp): void {
+        this.clear();
+
+        this.drawCallback(this, timestamp - this.lastFrameTimestamp);
+        this.lastFrameTimestamp = timestamp;
+        this.nextFrame();
+    }
+
+    private createShader(source: string, type: number, glProgram: WebGLProgram, shaderName: string): void {
+        const shader = this.glCtx.createShader(type) as WebGLShader;
+        this.glCtx.shaderSource(shader, source);
+        this.glCtx.compileShader(shader);
+
+        const compileStatus = this.glCtx.getShaderParameter(shader, this.glCtx.COMPILE_STATUS);
+        if (!compileStatus) {
+            console.log('Error compiling shader: ' + shaderName);
+            console.log(this.glCtx.getShaderInfoLog(shader));
+        }
+
+        this.glCtx.attachShader(glProgram, shader);
     }
 }
