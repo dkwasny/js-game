@@ -29,18 +29,16 @@ export class Display {
 
     private lastFrameTimestamp = 0;
 
-    private _preserveAspectRatio: boolean;
-    private _internalWidth: number;
-    private _internalHeight: number;
-
-    private readonly glResolutionAttributeLocation: number;
-
-    private readonly glPositionAttributeLocation: number;
-    private readonly glPositionBuffer: WebGLBuffer;
-
-    private readonly glColorUniformLocation: WebGLUniformLocation;
+    preserveAspectRatio: boolean;
+    internalWidth: number;
+    internalHeight: number;
 
     clearColor: Color;
+
+    private readonly glResolutionAttributeLocation: number;
+    private readonly glPositionAttributeLocation: number;
+    private readonly glPositionBuffer: WebGLBuffer;
+    private readonly glColorUniformLocation: WebGLUniformLocation;
 
     constructor(
         pCanvas: HTMLCanvasElement,
@@ -52,11 +50,11 @@ export class Display {
     ) {
         this.canvas = pCanvas;
         this.container = pCanvas.parentElement as HTMLElement;
-        this.glCtx = this.canvas.getContext('webgl') as WebGLRenderingContext;
+        this.glCtx = this.canvas.getContext('webgl', { alpha: false }) as WebGLRenderingContext;
         this.drawCallback = pDrawCallback;
-        this._internalWidth = pInternalWidth;
-        this._internalHeight = pInternalHeight;
-        this._preserveAspectRatio = pPreserveAspectRatio;
+        this.internalWidth = pInternalWidth;
+        this.internalHeight = pInternalHeight;
+        this.preserveAspectRatio = pPreserveAspectRatio;
         this.clearColor = pClearColor;
 
         const glProgram = this.glCtx.createProgram() as WebGLProgram;
@@ -75,7 +73,6 @@ export class Display {
         this.glCtx.useProgram(glProgram);
 
         this.glCtx.enable(this.glCtx.BLEND);
-        // KWAS TODO: Better understand alpha stuff
         this.glCtx.blendFunc(this.glCtx.SRC_ALPHA, this.glCtx.ONE_MINUS_SRC_ALPHA);
     }
 
@@ -84,19 +81,19 @@ export class Display {
         let actualHeight = this.container.clientHeight;
 
         if (this.preserveAspectRatio) {
-            const scaledHeight = actualWidth * this._internalHeight / this._internalWidth;
+            const scaledHeight = actualWidth * this.internalHeight / this.internalWidth;
             if (scaledHeight < actualHeight) {
                 actualHeight = scaledHeight;
             }
             else {
-                actualWidth = actualHeight * this._internalWidth / this._internalHeight;
+                actualWidth = actualHeight * this.internalWidth / this.internalHeight;
             }
         }
 
         this.canvas.height = actualHeight;
         this.canvas.width = actualWidth;
         this.glCtx.viewport(0, 0, actualWidth, actualHeight);
-        this.glCtx.vertexAttrib2f(this.glResolutionAttributeLocation, this._internalWidth, this._internalHeight);
+        this.glCtx.vertexAttrib2f(this.glResolutionAttributeLocation, this.internalWidth, this.internalHeight);
     }
 
     clear(): void {
@@ -131,24 +128,6 @@ export class Display {
         );
         this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, new Float32Array(points), this.glCtx.DYNAMIC_DRAW);
         this.glCtx.drawArrays(this.glCtx.TRIANGLES, 0, points.length / 2);
-    }
-
-    set internalHeight(pValue: number) {
-        this._internalHeight = pValue;
-        this.resize();
-    }
-
-    set internalWidth(pValue: number) {
-        this._internalWidth = pValue;
-        this.resize();
-    }
-
-    get preserveAspectRatio(): boolean {
-        return this._preserveAspectRatio;
-    }
-    set preserveAspectRatio(pValue: boolean) {
-        this._preserveAspectRatio = pValue;
-        this.resize();
     }
 
     private nextFrame(): void {

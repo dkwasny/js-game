@@ -1,5 +1,6 @@
 import { Display } from './display.js';
 import { Color } from './color.js';
+import { Rectangle } from './rectangle.js';
 
 const setRes = function() {
     const input = prompt('New Internal Resolution (w:h)');
@@ -7,54 +8,34 @@ const setRes = function() {
         const [newW,newH] = input.split(':');
         display.internalWidth = +newW;
         display.internalHeight = +newH;
-        square.reset();
+        display.resize();
+        foregroundSquare.reset();
     }
 };
 
 const togglePreserveAspectRatio = function() {
     console.log(display.preserveAspectRatio);
     display.preserveAspectRatio = !display.preserveAspectRatio;
+    display.resize();
 };
 
-const square = {
-    x: 0,
-    y: 0,
-    height: 10,
-    width: 10,
-    color: new Color(198, 93, 109, 1.0),
-    draw: function(display: Display) {
-        display.setColor(this.color);
-        const positionData = [
-            this.x, this.y, // top left
-            this.x + this.width, this.y, // top right
-            this.x, this.y + this.height, // bottom left
-
-            this.x, this.y + this.height, // bottom left
-            this.x + this.width, this.y, // top right
-            this.x + this.width, this.y + this.height // bottom right
-        ];
-        display.drawTriangles(positionData);
-    },
-    reset: function() {
-        this.x = 0;
-        this.y = 0;
-    }
-};
+const backgroundSquare = new Rectangle(0, 0, 10, 10, new Color(57, 167, 106, 1.0));
+const foregroundSquare = new Rectangle(0, 0, 10, 10, new Color(198, 93, 109, 0.75));
 
 const handleKeyPress = function(event: KeyboardEvent) {
     const key = event.key;
     switch(key) {
     case 'ArrowLeft':
-        square.x -= 1;
+        foregroundSquare.x -= 1;
         break;
     case 'ArrowRight':
-        square.x += 1;
+        foregroundSquare.x += 1;
         break;
     case 'ArrowUp':
-        square.y += 1;
+        foregroundSquare.y += 1;
         break;
     case 'ArrowDown':
-        square.y -= 1;
+        foregroundSquare.y -= 1;
         break;
     case 'a':
         setRes();
@@ -66,10 +47,9 @@ const handleKeyPress = function(event: KeyboardEvent) {
 };
 
 const draw = function(display: Display, delta: number) {
-    square.draw(display);
+    backgroundSquare.draw(display);
+    foregroundSquare.draw(display);
 };
-
-const canvas = document.getElementById('kwasCanvas') as HTMLCanvasElement;
 
 const backgroundColor = new Color(50, 54, 140);
 const display = new Display(document.getElementById('kwasCanvas') as HTMLCanvasElement, draw, 100, 100, true, backgroundColor);
