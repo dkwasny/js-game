@@ -1,12 +1,25 @@
 import { Color } from './color.js';
+import { Entity } from './entity.js';
+
+const vertexPositionStr = 'vertexPosition';
+const entityPositionStr = 'entityPosition';
+const entitySizeStr = 'entitySize';
+const entityResolutionStr = 'entityResolution';
+const internalResolutionStr = 'internalResolution';
+const inputColorStr = 'inputColor';
 
 const vertexShaderCode = `
-    attribute vec2 inputPosition;
-    attribute vec2 resolution;
+    attribute vec2 ${vertexPositionStr};
+    uniform vec2 ${entityPositionStr};
+    uniform vec2 ${entitySizeStr};
+    uniform vec2 ${entityResolutionStr};
+    uniform vec2 ${internalResolutionStr};
 
     void main() {
-        vec2 normalized = inputPosition / resolution;
-        gl_Position = vec4(normalized, 0, 1);
+        vec2 internalVert = ${vertexPositionStr} * ${entitySizeStr} / ${entityResolutionStr} + ${entityPositionStr};
+        vec2 clipVert = internalVert / ${internalResolutionStr};
+        vec2 normalizedToBottomLeft = clipVert * 2.0 - 1.0;
+        gl_Position = vec4(normalizedToBottomLeft, 0, 1);
     }
 `;
 
@@ -14,10 +27,10 @@ const fragmentShaderCode = `
     precision mediump float;
 
     const vec4 scale = vec4(255.0, 255.0, 255.0, 1.0);
-    uniform vec4 inputColor;
+    uniform vec4 ${inputColorStr};
 
     void main() {
-        gl_FragColor = inputColor / scale;
+        gl_FragColor = ${inputColorStr} / scale;
     }
 `;
 
@@ -35,10 +48,14 @@ export class Display {
 
     clearColor: Color;
 
-    private readonly glResolutionAttributeLocation: number;
-    private readonly glPositionAttributeLocation: number;
-    private readonly glPositionBuffer: WebGLBuffer;
-    private readonly glColorUniformLocation: WebGLUniformLocation;
+    private readonly glInternalResolutionUnif: WebGLUniformLocation;
+    private readonly glEntityResolutionUnif: WebGLUniformLocation;
+    private readonly glEntitySizeUnif: WebGLUniformLocation;
+    private readonly glEntityPositionUnif: WebGLUniformLocation;
+    private readonly glVertexPositionAttr: number;
+
+    private readonly glVertexPositionBuffer: WebGLBuffer;
+    private readonly glColorUnif: WebGLUniformLocation;
 
     constructor(
         pCanvas: HTMLCanvasElement,
@@ -64,11 +81,15 @@ export class Display {
 
         this.glCtx.linkProgram(glProgram);
 
-        this.glPositionAttributeLocation = this.glCtx.getAttribLocation(glProgram, 'inputPosition');
-        this.glResolutionAttributeLocation = this.glCtx.getAttribLocation(glProgram, 'resolution');
-        this.glColorUniformLocation = this.glCtx.getUniformLocation(glProgram, 'inputColor') as WebGLUniformLocation;
+        this.glVertexPositionAttr = this.glCtx.getAttribLocation(glProgram, vertexPositionStr);
+        this.glEntityPositionUnif = this.glCtx.getUniformLocation(glProgram, entityPositionStr) as WebGLUniformLocation;
+        this.glEntitySizeUnif = this.glCtx.getUniformLocation(glProgram, entitySizeStr) as WebGLUniformLocation;
+        this.glEntityResolutionUnif = this.glCtx.getUniformLocation(glProgram, entityResolutionStr) as WebGLUniformLocation;
+        this.glInternalResolutionUnif = this.glCtx.getUniformLocation(glProgram, internalResolutionStr) as WebGLUniformLocation;
 
-        this.glPositionBuffer = this.glCtx.createBuffer() as WebGLBuffer;
+        this.glColorUnif = this.glCtx.getUniformLocation(glProgram, inputColorStr) as WebGLUniformLocation;
+
+        this.glVertexPositionBuffer = this.glCtx.createBuffer() as WebGLBuffer;
 
         this.glCtx.useProgram(glProgram);
 
@@ -88,12 +109,13 @@ export class Display {
             else {
                 actualWidth = actualHeight * this.internalWidth / this.internalHeight;
             }
+
+            this.canvas.height = actualHeight;
+            this.canvas.width = actualWidth;
         }
 
-        this.canvas.height = actualHeight;
-        this.canvas.width = actualWidth;
         this.glCtx.viewport(0, 0, actualWidth, actualHeight);
-        this.glCtx.vertexAttrib2f(this.glResolutionAttributeLocation, this.internalWidth, this.internalHeight);
+        this.glCtx.uniform2f(this.glInternalResolutionUnif, this.internalWidth, this.internalHeight);
     }
 
     clear(): void {
@@ -111,15 +133,20 @@ export class Display {
         this.nextFrame();
     }
 
-    setColor(color: Color): void {
-        this.glCtx.uniform4f(this.glColorUniformLocation, color.red, color.green, color.blue, color.alpha);
+    drawEntity(entity: Entity): void {
+        const color = entity.color;
+        this.glCtx.uniform4f(this.glColorUnif, color.red, color.green, color.blue, color.alpha);
+        this.glCtx.uniform2f(this.glEntityPositionUnif, entity.x, entity.y);
+        this.glCtx.uniform2f(this.glEntitySizeUnif, entity.width, entity.height);
+        this.glCtx.uniform2f(this.glEntityResolutionUnif, entity.internalWidth, entity.internalHeight);
+        this.drawTriangles(entity.verticies);
     }
 
-    drawTriangles(points: number[]): void {
-        this.glCtx.enableVertexAttribArray(this.glPositionAttributeLocation);
-        this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.glPositionBuffer);
+    private drawTriangles(points: number[]): void {
+        this.glCtx.enableVertexAttribArray(this.glVertexPositionAttr);
+        this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.glVertexPositionBuffer);
         this.glCtx.vertexAttribPointer(
-            this.glPositionAttributeLocation,
+            this.glVertexPositionAttr,
             2,
             this.glCtx.FLOAT,
             false,
