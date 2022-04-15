@@ -31,7 +31,9 @@ const togglePreserveAspectRatio = function() {
 };
 
 const backgroundSquare = new Rectangle(45, 45, 10, 10, new Color(57, 167, 106, 1.0));
-const foregroundALetter = new LetterA(47, 45, 6, 10, new Color(198, 93, 109, 0.75));
+// const foregroundALetter = new LetterA(47, 45, 6, 10, new Color(198, 93, 109, 0.75));
+// const foregroundALetter = new Rectangle(47, 45, 6, 10, new Color(198, 93, 109, 0.75));
+const foregroundALetter = new Rectangle(47, 45, 6, 10, new Color(255, 255, 255, 1.0));
 
 const handleKeyPress = function(event: KeyboardEvent) {
     const key = event.key;

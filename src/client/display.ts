@@ -7,19 +7,27 @@ const entitySizeStr = 'entitySize';
 const entityResolutionStr = 'entityResolution';
 const internalResolutionStr = 'internalResolution';
 const inputColorStr = 'inputColor';
+const vertexTextureCoordStr = 'vertexTextureCoord';
+const fragmentTextureCoordStr = 'fragmentTextureCoord';
+const textureSamplerStr = 'textureSampler';
 
 const vertexShaderCode = `
     attribute vec2 ${vertexPositionStr};
+    attribute vec2 ${vertexTextureCoordStr};
+
     uniform vec2 ${entityPositionStr};
     uniform vec2 ${entitySizeStr};
     uniform vec2 ${entityResolutionStr};
     uniform vec2 ${internalResolutionStr};
+
+    varying vec2 ${fragmentTextureCoordStr};
 
     void main() {
         vec2 internalVert = ${vertexPositionStr} * ${entitySizeStr} / ${entityResolutionStr} + ${entityPositionStr};
         vec2 clipVert = internalVert / ${internalResolutionStr};
         vec2 normalizedToBottomLeft = clipVert * 2.0 - 1.0;
         gl_Position = vec4(normalizedToBottomLeft, 0, 1);
+        ${fragmentTextureCoordStr} = ${vertexTextureCoordStr};
     }
 `;
 
@@ -27,10 +35,24 @@ const fragmentShaderCode = `
     precision mediump float;
 
     const vec4 scale = vec4(255.0, 255.0, 255.0, 1.0);
+
     uniform vec4 ${inputColorStr};
+    uniform sampler2D ${textureSamplerStr};
+
+    varying vec2 ${fragmentTextureCoordStr};
 
     void main() {
-        gl_FragColor = ${inputColorStr} / scale;
+        vec4 primitiveColor = ${inputColorStr} / scale;
+        vec4 textureColor = texture2D(${textureSamplerStr}, ${fragmentTextureCoordStr});
+
+        // TODO: This isn't right
+        float sourceAlpha = textureColor.a;
+        float oneMinusSrcAlpha = 1.0 - sourceAlpha;
+
+        vec4 primitiveblah = primitiveColor * oneMinusSrcAlpha;
+        vec4 texblah = textureColor * sourceAlpha;
+
+        gl_FragColor = primitiveblah + texblah;
     }
 `;
 
@@ -57,6 +79,10 @@ export class Display {
     private readonly glVertexPositionBuffer: WebGLBuffer;
     private readonly glColorUnif: WebGLUniformLocation;
 
+    private readonly glVertexTextureCoordAttr: number;
+    private readonly glTextureSamplerUnif: WebGLUniformLocation;
+    private readonly glVertexTextureCoordBuffer: WebGLBuffer;
+
     constructor(
         pCanvas: HTMLCanvasElement,
         pDrawCallback: (display: Display, delta: number) => void,
@@ -82,14 +108,17 @@ export class Display {
         this.glCtx.linkProgram(glProgram);
 
         this.glVertexPositionAttr = this.glCtx.getAttribLocation(glProgram, vertexPositionStr);
+        this.glVertexTextureCoordAttr = this.glCtx.getAttribLocation(glProgram, vertexTextureCoordStr);
+
         this.glEntityPositionUnif = this.glCtx.getUniformLocation(glProgram, entityPositionStr) as WebGLUniformLocation;
         this.glEntitySizeUnif = this.glCtx.getUniformLocation(glProgram, entitySizeStr) as WebGLUniformLocation;
         this.glEntityResolutionUnif = this.glCtx.getUniformLocation(glProgram, entityResolutionStr) as WebGLUniformLocation;
         this.glInternalResolutionUnif = this.glCtx.getUniformLocation(glProgram, internalResolutionStr) as WebGLUniformLocation;
-
         this.glColorUnif = this.glCtx.getUniformLocation(glProgram, inputColorStr) as WebGLUniformLocation;
+        this.glTextureSamplerUnif = this.glCtx.getUniformLocation(glProgram, textureSamplerStr) as WebGLUniformLocation;
 
         this.glVertexPositionBuffer = this.glCtx.createBuffer() as WebGLBuffer;
+        this.glVertexTextureCoordBuffer = this.glCtx.createBuffer() as WebGLBuffer;
 
         this.glCtx.useProgram(glProgram);
 
@@ -134,15 +163,74 @@ export class Display {
     }
 
     drawEntity(entity: Entity): void {
+        if (entity.needsTexture()) {
+            entity.loadedTexture = this.createTexture(entity);
+        }
+
         const color = entity.color;
         this.glCtx.uniform4f(this.glColorUnif, color.red, color.green, color.blue, color.alpha);
         this.glCtx.uniform2f(this.glEntityPositionUnif, entity.x, entity.y);
         this.glCtx.uniform2f(this.glEntitySizeUnif, entity.width, entity.height);
         this.glCtx.uniform2f(this.glEntityResolutionUnif, entity.internalWidth, entity.internalHeight);
+
+        if (entity.textureData.length > 0) {
+            const texture = entity.loadedTexture as WebGLTexture;
+            this.setupTexture(entity.textureCoords, texture);
+        }
+
         this.drawTriangles(entity.verticies);
     }
 
-    private drawTriangles(points: number[]): void {
+    private createTexture(entity: Entity): WebGLTexture {
+        const texture = this.glCtx.createTexture() as WebGLTexture;
+        this.glCtx.bindTexture(this.glCtx.TEXTURE_2D, texture);
+
+        this.glCtx.texImage2D(
+            this.glCtx.TEXTURE_2D,
+            0,
+            this.glCtx.RGBA,
+            entity.textureWidth,
+            entity.textureHeight,
+            0,
+            this.glCtx.RGBA,
+            this.glCtx.UNSIGNED_BYTE,
+            entity.textureData
+        );
+
+        this.glCtx.texParameteri(
+            this.glCtx.TEXTURE_2D,
+            this.glCtx.TEXTURE_MIN_FILTER,
+            this.glCtx.NEAREST
+        );
+        this.glCtx.texParameteri(
+            this.glCtx.TEXTURE_2D,
+            this.glCtx.TEXTURE_MAG_FILTER,
+            this.glCtx.NEAREST
+        );
+        // this.glCtx.generateMipmap(this.glCtx.TEXTURE_2D);
+
+        return texture;
+    }
+
+    private setupTexture(coords: Float32Array, texture: WebGLTexture): void {
+        this.glCtx.enableVertexAttribArray(this.glVertexTextureCoordAttr);
+        this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.glVertexTextureCoordBuffer);
+        this.glCtx.vertexAttribPointer(
+            this.glVertexTextureCoordAttr,
+            2,
+            this.glCtx.FLOAT,
+            false,
+            0,
+            0
+        );
+        this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, coords, this.glCtx.DYNAMIC_DRAW);
+
+        this.glCtx.activeTexture(this.glCtx.TEXTURE0);
+        this.glCtx.bindTexture(this.glCtx.TEXTURE_2D, texture);
+        this.glCtx.uniform1i(this.glTextureSamplerUnif, 0);
+    }
+
+    private drawTriangles(points: Float32Array): void {
         this.glCtx.enableVertexAttribArray(this.glVertexPositionAttr);
         this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.glVertexPositionBuffer);
         this.glCtx.vertexAttribPointer(
@@ -153,7 +241,7 @@ export class Display {
             0,
             0
         );
-        this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, new Float32Array(points), this.glCtx.DYNAMIC_DRAW);
+        this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, points, this.glCtx.DYNAMIC_DRAW);
         this.glCtx.drawArrays(this.glCtx.TRIANGLES, 0, points.length / 2);
     }
 

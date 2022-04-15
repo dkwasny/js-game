@@ -9,7 +9,13 @@ export abstract class Entity {
 
     internalWidth: number;
     internalHeight: number;
-    verticies: number[];
+    verticies: Float32Array;
+    textureWidth: number;
+    textureHeight: number;
+    textureCoords: Float32Array;
+    textureData: Uint8Array;
+
+    loadedTexture: WebGLTexture | null;
 
     constructor(
         pX: number,
@@ -19,7 +25,11 @@ export abstract class Entity {
         pColor: Color,
         pInternalWidth: number,
         pInternalHeight: number,
-        pVerticies: number[]
+        pVerticies: number[],
+        pTextureWidth = 0,
+        pTextureHeight = 0,
+        pTextureCoords: number[] = [],
+        pTextureData: number[] = []
     ) {
         this.x = pX;
         this.y = pY;
@@ -28,11 +38,20 @@ export abstract class Entity {
         this.color = pColor;
         this.internalWidth = pInternalWidth;
         this.internalHeight = pInternalHeight;
-        this.verticies = pVerticies;
+        this.verticies = new Float32Array(pVerticies);
+        this.textureWidth = pTextureWidth;
+        this.textureHeight = pTextureHeight;
+        this.textureCoords = new Float32Array(pTextureCoords);
+        this.textureData = new Uint8Array(pTextureData);
+        this.loadedTexture = null;
     }
 
     reset(): void {
         this.x= 0;
         this.y = 0;
+    }
+
+    needsTexture(): boolean {
+        return this.loadedTexture === null && this.textureData.length > 0;
     }
 }
