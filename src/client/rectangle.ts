@@ -1,8 +1,8 @@
 import { Color } from './color.js';
 import { Entity } from './entity.js';
 
-const internalWidth = 2;
-const internalHeight = 2;
+const internalWidth = 1;
+const internalHeight = 1;
 function getVerticies(): number[] {
     return [
         0, 0,
@@ -17,10 +17,10 @@ function getVerticies(): number[] {
 
 function getTextureData(): number[] {
     return [
-        0, 0, 255, 100,
-        0, 255, 0, 100,
-        255, 0, 0, 100,
-        255, 255, 255, 100
+        0, 0, 255, 50,
+        0, 255, 0, 50,
+        255, 0, 0, 50,
+        255, 255, 255, 50
     ];
 }
 

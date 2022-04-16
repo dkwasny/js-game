@@ -23,10 +23,25 @@ const vertexShaderCode = `
     varying vec2 ${fragmentTextureCoordStr};
 
     void main() {
-        vec2 internalVert = ${vertexPositionStr} * ${entitySizeStr} / ${entityResolutionStr} + ${entityPositionStr};
-        vec2 clipVert = internalVert / ${internalResolutionStr};
+        // Scale the vertex based on the entity's actual Size
+        // and internal resolution.
+        vec2 scaledVert = ${vertexPositionStr} * ${entitySizeStr} / ${entityResolutionStr};
+
+        // Translate the vertex based on the entity's position.
+        vec2 translatedVert = scaledVert + ${entityPositionStr};
+
+        // Convert the vertex to clip space (-1.0 <= vertex <= 1.0)
+        // so OpenGL can render it.
+        vec2 clipVert = translatedVert / ${internalResolutionStr};
+
+        // Additional translation to move 0,0 to the
+        // bottom left of the window.
         vec2 normalizedToBottomLeft = clipVert * 2.0 - 1.0;
+
+        // Pass the 2D coordintes off in a vec4
         gl_Position = vec4(normalizedToBottomLeft, 0, 1);
+
+        // Pass the texture coordinate off to the fragment shader
         ${fragmentTextureCoordStr} = ${vertexTextureCoordStr};
     }
 `;
@@ -42,17 +57,27 @@ const fragmentShaderCode = `
     varying vec2 ${fragmentTextureCoordStr};
 
     void main() {
-        vec4 primitiveColor = ${inputColorStr} / scale;
-        vec4 textureColor = texture2D(${textureSamplerStr}, ${fragmentTextureCoordStr});
+        // Scale the primitive color from 0-255 scale to 0.0-1.0
+        // for OpenGL.
+        vec4 primitive = ${inputColorStr} / scale;
 
-        // TODO: This isn't right
-        float sourceAlpha = textureColor.a;
-        float oneMinusSrcAlpha = 1.0 - sourceAlpha;
+        // Get the respective color from the texture based
+        // on the provided texture coordinate
+        vec4 texture = texture2D(${textureSamplerStr}, ${fragmentTextureCoordStr});
 
-        vec4 primitiveblah = primitiveColor * oneMinusSrcAlpha;
-        vec4 texblah = textureColor * sourceAlpha;
+        // Blend the texture color onto the primitive color
+        // based on a formula I found on Wikipedia.
+        // https://en.wikipedia.org/wiki/Alpha_compositing
+        float alphaP = primitive.a;
+        float alphaT = texture.a;
+        float alphaOut = alphaT + alphaP * (1.0 - alphaT);
 
-        gl_FragColor = primitiveblah + texblah;
+        vec3 colorP = primitive.rgb;
+        vec3 colorT = texture.rgb;
+        vec3 colorOut = ((colorT * alphaT) + (colorP * alphaP * (1.0 - alphaT))) / alphaOut;
+
+        // Pass the output color and alpha values in a vec4
+        gl_FragColor = vec4(colorOut, alphaOut);
     }
 `;
 
@@ -93,7 +118,7 @@ export class Display {
     ) {
         this.canvas = pCanvas;
         this.container = pCanvas.parentElement as HTMLElement;
-        this.glCtx = this.canvas.getContext('webgl', { alpha: false }) as WebGLRenderingContext;
+        this.glCtx = this.canvas.getContext('webgl', { alpha: false, antialias: false }) as WebGLRenderingContext;
         this.drawCallback = pDrawCallback;
         this.internalWidth = pInternalWidth;
         this.internalHeight = pInternalHeight;
